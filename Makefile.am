@@ -1,5 +1,5 @@
-EXTRA_DIST = README.md CHANGELOG.md doc/Doxyfile
 
+EXTRA_DIST = README.md CHANGELOG.md doc/Doxyfile
 # doxygen
 dist-hook:
 	cd $(distdir)/doc; doxygen
@@ -70,6 +70,10 @@ src_libopenslide_la_CPPFLAGS = -D_OPENSLIDE_BUILDING_DLL \
 
 src_libopenslide_la_LDFLAGS = -version-info 4:1:4 -no-undefined
 
+if BUILD_FUZZER
+src_libopenslide_la_CPPFLAGS += -fsanitize=fuzzer-no-link
+src_libopenslide_la_LDFLAGS += -fsanitize=fuzzer-no-link
+endif
 
 pkginclude_HEADERS = \
 	src/openslide.h \
@@ -103,6 +107,11 @@ common_libopenslide_common_a_SOURCES = \
 COMMON_CPPFLAGS = $(GLIB2_CFLAGS) -I$(top_srcdir)/src -I$(top_srcdir)/common
 COMMON_LDADD = common/libopenslide-common.a src/libopenslide.la $(GLIB2_LIBS)
 
+if BUILD_FUZZER
+COMMON_CPPFLAGS += -fsanitize=fuzzer-no-link
+common_libopenslide_common_a_CPPFLAGS += -fsanitize=fuzzer-no-link
+common_libopenslide_common_a_LDFLAGS = -fsanitize=fuzzer-no-link
+endif
 
 # test
 
@@ -114,30 +123,58 @@ noinst_SCRIPTS = test/driver
 CLEANFILES += test/driver
 EXTRA_DIST += test/driver.in
 
+if BUILD_FUZZER
+FUZZ_FLAGS = -fsanitize=fuzzer-no-link
+TEST_CFLAGS += -fsanitize=fuzzer-no-link
+else
+FUZZ_FLAGS :=
+endif
+
+test_test_CPPFLAGS = $(COMMON_CPPFLAGS) $(CAIRO_CFLAGS) $(VALGRIND_CFLAGS)
+test_test_CFLAGS = $(AM_CFLAGS) $(TEST_CFLAGS)
+test_test_LDFLAGS = $(FUZZ_FLAGS)
+# VALGRIND_LIBS not needed
+test_test_LDADD = $(COMMON_LDADD) $(CAIRO_LIBS)
+
 test_try_open_CPPFLAGS = $(COMMON_CPPFLAGS) $(VALGRIND_CFLAGS)
 test_try_open_CFLAGS = $(AM_CFLAGS) $(TEST_CFLAGS) -Wno-deprecated-declarations
+
 test_try_open_LDADD = $(COMMON_LDADD)
+test_try_open_LDFLAGS = $(FUZZ_FLAGS)
 
 test_parallel_CPPFLAGS = $(COMMON_CPPFLAGS)
 test_parallel_CFLAGS = $(AM_CFLAGS) $(TEST_CFLAGS)
 test_parallel_LDADD = $(COMMON_LDADD)
+test_parallel_LDFLAGS = $(FUZZ_FLAGS)
 
 test_query_CPPFLAGS = $(COMMON_CPPFLAGS)
 test_query_CFLAGS = $(AM_CFLAGS) $(TEST_CFLAGS)
 test_query_LDADD = $(COMMON_LDADD)
+test_query_LDFLAGS = $(FUZZ_FLAGS)
 
 test_extended_CPPFLAGS = $(COMMON_CPPFLAGS)
 test_extended_CFLAGS = $(AM_CFLAGS) $(TEST_CFLAGS)
 test_extended_LDADD = $(COMMON_LDADD)
+test_extended_LDFLAGS = $(FUZZ_FLAGS)
 
 test_mosaic_CPPFLAGS = $(COMMON_CPPFLAGS) $(CAIRO_CFLAGS)
 test_mosaic_CFLAGS = $(AM_CFLAGS) $(TEST_CFLAGS)
 test_mosaic_LDADD = $(COMMON_LDADD) $(CAIRO_LIBS)
+test_mosaic_LDFLAGS = $(FUZZ_FLAGS)
 
 test_profile_CPPFLAGS = $(COMMON_CPPFLAGS) $(VALGRIND_CFLAGS)
 test_profile_CFLAGS = $(AM_CFLAGS) $(TEST_CFLAGS)
 # VALGRIND_LIBS not needed
 test_profile_LDADD = $(COMMON_LDADD)
+test_profile_LDFLAGS = $(FUZZ_FLAGS)
+
+if BUILD_FUZZER
+test_fuzz_CPPFLAGS = $(COMMON_CPPFLAGS) $(VALGRIND_CFLAGS)
+test_fuzz_CFLAGS = $(AM_CFLAGS) -fsanitize=fuzzer
+test_fuzz_LDFLAGS = -fsanitize=fuzzer
+test_fuzz_LDADD = $(COMMON_LDADD)
+noinst_PROGRAMS += test/fuzz
+endif
 
 test_synth_CPPFLAGS = $(COMMON_CPPFLAGS) $(VALGRIND_CFLAGS)
 test_synth_CFLAGS = $(AM_CFLAGS) $(TEST_CFLAGS)
@@ -180,5 +217,13 @@ man_MANS += tools/openslide-write-png.1
 tools_openslide_write_png_CPPFLAGS = $(COMMON_CPPFLAGS) $(LIBPNG_CFLAGS)
 tools_openslide_write_png_LDADD = $(COMMON_LDADD) $(LIBPNG_LIBS)
 
+if BUILD_FUZZER
+tools_openslide_show_properties_CPPFLAGS += -fsanitize=fuzzer-no-link
+tools_openslide_show_properties_LDFLAGS = -fsanitize=fuzzer-no-link
+tools_openslide_quickhash1sum_CPPFLAGS += -fsanitize=fuzzer-no-link
+tools_openslide_quickhash1sum_LDFLAGS = -fsanitize=fuzzer-no-link
+tools_openslide_write_png_CPPFLAGS += -fsanitize=fuzzer-no-link
+tools_openslide_write_png_LDFLAGS = -fsanitize=fuzzer-no-link
+endif
 # man pages
 EXTRA_DIST += $(man_MANS:=.in)
