@@ -1,4 +1,5 @@
-EXTRA_DIST = README.txt lgpl-2.1.txt LICENSE.txt CHANGELOG.txt doc/Doxyfile CONTRIBUTING.txt
+
+EXTRA_DIST = README.md CHANGELOG.md doc/Doxyfile
 # doxygen
 dist-hook:
 	cd $(distdir)/doc; doxygen
@@ -27,6 +28,7 @@ src_libopenslide_la_SOURCES = \
 	src/openslide-decode-tifflike.c \
 	src/openslide-decode-xml.c \
 	src/openslide-error.c \
+	src/openslide-file.c \
 	src/openslide-grid.c \
 	src/openslide-hash.c \
 	src/openslide-jdatasrc.c \
@@ -39,6 +41,7 @@ src_libopenslide_la_SOURCES = \
 	src/openslide-vendor-mirax.c \
 	src/openslide-vendor-philips.c \
 	src/openslide-vendor-sakura.c \
+	src/openslide-vendor-synthetic.c \
 	src/openslide-vendor-trestle.c \
 	src/openslide-vendor-ventana.c
 
@@ -59,7 +62,7 @@ endif
 .rc.lo:
 	$(AM_V_GEN)$(LIBTOOL) $(AM_V_lt) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --tag=RC --mode=compile $(RC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) -i "$<" -o "$@"
 
-src_libopenslide_la_CPPFLAGS = -pedantic -D_OPENSLIDE_BUILDING_DLL \
+src_libopenslide_la_CPPFLAGS = -D_OPENSLIDE_BUILDING_DLL \
 	$(GLIB2_CFLAGS) $(CAIRO_CFLAGS) $(SQLITE3_CFLAGS) $(LIBXML2_CFLAGS) \
 	$(OPENJPEG_CFLAGS) $(LIBTIFF_CFLAGS) $(LIBPNG_CFLAGS) \
 	$(GDKPIXBUF_CFLAGS) $(ZLIB_CFLAGS) -DG_LOG_DOMAIN=\"Openslide\" \
@@ -113,7 +116,9 @@ endif
 
 # test
 
-noinst_PROGRAMS = test/test test/try_open test/parallel test/query \
+TESTS = test/synth
+
+noinst_PROGRAMS = test/synth test/try_open test/parallel test/query \
 	test/extended test/mosaic test/profile
 noinst_SCRIPTS = test/driver
 CLEANFILES += test/driver
@@ -132,8 +137,9 @@ test_test_LDFLAGS = $(FUZZ_FLAGS)
 # VALGRIND_LIBS not needed
 test_test_LDADD = $(COMMON_LDADD) $(CAIRO_LIBS)
 
-test_try_open_CPPFLAGS = $(COMMON_CPPFLAGS)
-test_try_open_CFLAGS = $(AM_CFLAGS) $(TEST_CFLAGS)
+test_try_open_CPPFLAGS = $(COMMON_CPPFLAGS) $(VALGRIND_CFLAGS)
+test_try_open_CFLAGS = $(AM_CFLAGS) $(TEST_CFLAGS) -Wno-deprecated-declarations
+
 test_try_open_LDADD = $(COMMON_LDADD)
 test_try_open_LDFLAGS = $(FUZZ_FLAGS)
 
@@ -159,6 +165,7 @@ test_mosaic_LDFLAGS = $(FUZZ_FLAGS)
 
 test_profile_CPPFLAGS = $(COMMON_CPPFLAGS) $(VALGRIND_CFLAGS)
 test_profile_CFLAGS = $(AM_CFLAGS) $(TEST_CFLAGS)
+# VALGRIND_LIBS not needed
 test_profile_LDADD = $(COMMON_LDADD)
 test_profile_LDFLAGS = $(FUZZ_FLAGS)
 
@@ -170,6 +177,10 @@ test_fuzz_LDADD = $(COMMON_LDADD)
 noinst_PROGRAMS += test/fuzz
 endif
 
+test_synth_CPPFLAGS = $(COMMON_CPPFLAGS) $(VALGRIND_CFLAGS)
+test_synth_CFLAGS = $(AM_CFLAGS) $(TEST_CFLAGS)
+test_synth_LDADD = $(COMMON_LDADD)
+
 if CYGWIN_CROSS_TEST
 noinst_PROGRAMS += test/symlink
 test_symlink_CFLAGS = $(AM_CFLAGS) -municode
@@ -180,6 +191,7 @@ endif
 test/driver: test/driver.in Makefile
 	$(AM_V_GEN)sed -e 's:!!SRCDIR!!:$(abs_srcdir)/test:g' \
 		-e 's:!!BUILDDIR!!:$(abs_builddir)/test:g' \
+		-e 's:!!GLIB2_DATADIR!!:$(GLIB2_DATADIR):g' \
 		-e 's:!!VERSION!!:$(VERSION):g' \
 		-e 's:!!CYGWIN_CROSS_TEST!!:$(CYGWIN_CROSS_TEST):g' \
 		-e 's:!!FEATURES!!:$(FEATURE_FLAGS):g' "$<" > "$@" && \

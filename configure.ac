@@ -14,7 +14,6 @@ AC_CANONICAL_BUILD
 AC_CANONICAL_HOST
 
 # Checks for programs.
-AM_PROG_CC_C_O
 AC_PROG_CC
 
 # Largefile
@@ -67,7 +66,7 @@ PKG_CHECK_MODULES(CAIRO, [cairo >= 1.2])
 PKG_CHECK_MODULES(LIBPNG, [libpng > 1.2])
 PKG_CHECK_MODULES(GDKPIXBUF, [gdk-pixbuf-2.0 >= 2.14])
 PKG_CHECK_MODULES(LIBXML2, [libxml-2.0])
-PKG_CHECK_MODULES(SQLITE3, [sqlite3 >= 3.6.20])
+PKG_CHECK_MODULES(SQLITE3, [sqlite3 >= 3.14])
 
 # optional
 PKG_CHECK_MODULES(VALGRIND, [valgrind], [
@@ -75,6 +74,24 @@ PKG_CHECK_MODULES(VALGRIND, [valgrind], [
 ], [:])
 
 gl_VISIBILITY
+
+# glib only offers autoptr macros when the compiler supports them
+AC_MSG_CHECKING([compiler support for cleanup attribute])
+saved_CFLAGS="$CFLAGS"
+CFLAGS="$CFLAGS $GLIB2_CFLAGS"
+AC_COMPILE_IFELSE([
+  AC_LANG_PROGRAM([
+    #include <glib.h>
+    #ifndef G_DEFINE_AUTOPTR_CLEANUP_FUNC
+    #error Cleanup functions not available
+    #endif
+  ])
+], [
+  AC_MSG_RESULT([yes])
+], [
+  AC_MSG_FAILURE([glib2 reports compiler does not support cleanup attribute])
+])
+CFLAGS="$saved_CFLAGS"
 
 # CLOEXEC
 AC_MSG_CHECKING([fopen() close-on-exec flag])
@@ -181,11 +198,12 @@ AS_CASE([$host],
   ]
 )
 
+# Path prefix for glib Valgrind suppressions
+PKG_CHECK_VAR(GLIB2_DATADIR, [gio-2.0], datadir)
+
 # Compiler warnings
 WARN_CFLAGS="-Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations -Wnested-externs"
 AC_SUBST([WARN_CFLAGS])
-# MinGW only
-gl_WARN_ADD([-Wno-pedantic-ms-format])
 
 AC_SUBST(AM_CFLAGS, ['$(WARN_CFLAGS) $(CFLAG_VISIBILITY) -DG_DISABLE_SINGLE_INCLUDES -DGLIB_VERSION_MIN_REQUIRED=GLIB_VERSION_2_56 -DGLIB_VERSION_MAX_ALLOWED=GLIB_VERSION_MIN_REQUIRED -fno-common'])
 
