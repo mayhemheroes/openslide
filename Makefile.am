@@ -170,11 +170,11 @@ test_profile_LDADD = $(COMMON_LDADD)
 test_profile_LDFLAGS = $(FUZZ_FLAGS)
 
 if BUILD_FUZZER
-test_fuzz_CPPFLAGS = $(COMMON_CPPFLAGS) $(VALGRIND_CFLAGS)
-test_fuzz_CFLAGS = $(AM_CFLAGS) -fsanitize=fuzzer
-test_fuzz_LDFLAGS = -fsanitize=fuzzer
-test_fuzz_LDADD = $(COMMON_LDADD)
-noinst_PROGRAMS += test/fuzz
+test_fuzz_open_CPPFLAGS = $(COMMON_CPPFLAGS) $(VALGRIND_CFLAGS)
+test_fuzz_open_CFLAGS = $(AM_CFLAGS) -fsanitize=fuzzer
+test_fuzz_open_LDFLAGS = -fsanitize=fuzzer
+test_fuzz_open_LDADD = $(COMMON_LDADD)
+noinst_PROGRAMS += test/fuzz_open
 endif
 
 test_synth_CPPFLAGS = $(COMMON_CPPFLAGS) $(VALGRIND_CFLAGS)
