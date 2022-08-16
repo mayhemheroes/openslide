@@ -1,4 +1,3 @@
-image: ghcr.io/ennamarie19/openslide-fuzz:latest
 project: openslide
 target: openslide-fuzz
 testsuite:

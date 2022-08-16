@@ -15,10 +15,8 @@ RUN make install && make clean
 
 ##ADD source code to the build stage
 WORKDIR /
-ADD https://api.github.com/repos/ennamarie19/openslide/git/refs/heads/mayhem version.json
-RUN git clone -b mayhem https://github.com/ennamarie19/openslide.git
+ADD . /openslide
 WORKDIR /openslide
-
 
 ##Build
 RUN autoreconf -i
@@ -26,13 +24,11 @@ RUN ./configure CC="clang" CXX="clang++" BUILD_FUZZER=1
 RUN make -j$(nproc)
 RUN make install && ldconfig
 
-##Prepare all library dependencies for copy
-RUN mkdir /deps
-RUN cp `ldd ./test/.libs/fuzz | grep so | sed -e '/^[^\t]/ d' | sed -e 's/\t//' | sed -e 's/.*=..//' | sed -e 's/ (0.*)//' | sort | uniq` /deps 2>/dev/null || :
-#
 FROM --platform=linux/amd64 ubuntu:20.04
-COPY --from=builder /openslide/test/.libs/fuzz /fuzz
-COPY --from=builder /deps /usr/lib
+RUN apt-get update && \
+        DEBIAN_FRONTEND=noninteractive apt-get install -y libstdc++6 lib32stdc++6 libstdc++6 lib32stdc++6 libstdc++6 libglib2.0-0 libglib2.0-dev libglib2.0-0 libglib2.0-dev libc6-i386 libc6 libc6-i386 libc6 libc6-i386 libc6 libgcc-s1 lib32gcc-s1 libc6 libc6-i386 libcairo2 libsqlite3-0 libxml2 libopenjp2-7 libtiff5 libpng16-16 libjpeg-turbo8 libgdk-pixbuf2.0-0 zlib1g libglib2.0-0 libmount1 libselinux1 libc6 libc6-i386 libffi7 libpcre3 libpixman-1-0 libfontconfig1 libfreetype6 libxcb-shm0 libxcb1 libxcb-render0 libxrender1 libx11-6 libxext6 libicu66 liblzma5 libwebp6 libzstd1 libjbig0 libblkid1 libpcre2-8-0 libexpat1 libuuid1 libxau6 libxdmcp6 libicu66 libbsd0
+COPY --from=builder /openslide/test/.libs/fuzz_open /fuzz
+COPY --from=builder /usr/local/lib/libopenslide.so.0 /usr/lib
 
 CMD /fuzz
 
