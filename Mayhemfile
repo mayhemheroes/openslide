@@ -1,0 +1,9 @@
+project: openslide
+target: openslide-fuzz
+testsuite:
+    - file://test/corpus
+
+cmds:
+    - cmd: /fuzz
+      libfuzzer: true
+      max_length: 22000000
