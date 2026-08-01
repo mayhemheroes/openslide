@@ -22,7 +22,11 @@ nuget sources add -Source "${FEED_URL}" -StorePasswordInClearText \
     -Name GitHubPackages -UserName "${GH_USERNAME}" -Password "${GITHUB_TOKEN}"
 nuget setapikey "${GITHUB_TOKEN}" -Source "${FEED_URL}"
 
-( cd "${VCPKG_INSTALLATION_ROOT}" && git pull )
+(
+    cd "${VCPKG_INSTALLATION_ROOT}" &&
+    git pull &&
+    ./bootstrap-vcpkg.sh -disableMetrics
+)
 
 vcpkg install \
     pkgconf \
