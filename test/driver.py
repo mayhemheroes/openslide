@@ -26,7 +26,7 @@ from collections import defaultdict
 from collections.abc import Iterable, Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from configparser import RawConfigParser
-from contextlib import closing, contextmanager
+from contextlib import ExitStack, closing, contextmanager
 import errno
 import filecmp
 import fnmatch
@@ -94,7 +94,7 @@ PRISTINE = CACHE / 'pristine'
 FUSEMOUNT = CACHE / 'fuse'
 FROZENBASE = CACHE
 FROZEN = CACHE / 'frozen'
-FEATURES = set('@FEATURES@'.split())
+FEATURES = set('@FEATURES@'.split())  # noqa: SIM905
 TESTCONF = 'config.yaml'
 
 GREEN = '\033[1;32m'
@@ -119,6 +119,10 @@ class Skip:
 
 
 class ConnectionInterrupted(Exception):
+    pass
+
+
+class DriverError(Exception):
     pass
 
 
@@ -188,12 +192,16 @@ class BaseSlide:
 
         self.path.mkdir(parents=True)
         try:
-            if self.is_zip:
-                dest: BinaryIO = TemporaryFile(dir=self.path)
-            else:
-                dest = open(self.path / self.path.name, 'wb')
+            with ExitStack() as stack:
+                if self.is_zip:
+                    dest: BinaryIO = stack.enter_context(
+                        TemporaryFile(dir=self.path)
+                    )
+                else:
+                    dest = stack.enter_context(
+                        open(self.path / self.path.name, 'wb')
+                    )
 
-            with dest:
                 for retries_remaining in range(4, -1, -1):
                     try:
                         digest = _download(url, str(self), dest)
@@ -304,7 +312,7 @@ class UnpackedSlide:
         valgrind: bool = False,
         progdir: Path | None = None,
         debug: Iterable[str] | None = None,
-        vendor: str | None | type[Skip] = Skip,
+        vendor: str | type[Skip] | None = Skip,
         properties: dict[str, str | None] | None = None,
         regions: Iterable[Iterable[int]] | None = None,
     ) -> str | None:
@@ -1275,22 +1283,22 @@ def unfreeze() -> None:
             )
         fh.seek(0)
         print('Unpacking...')
-        tf = tarfile.open(fileobj=fh)
-        while True:
-            info = tf.next()
-            if info is None:
-                break
-            # directory traversal shouldn't happen because we check the
-            # tarball hash, but check anyway
-            normalized = os.path.normpath(info.name)
-            if normalized.startswith('/') or normalized.startswith('../'):
-                raise OSError(f'Directory traversal: {info.name}')
-            if info.isfile() or info.isdir():
-                tf.extract(info, path=basedir, set_attrs=False)
-            elif info.issym():
-                (basedir / info.name).symlink_to(info.linkname)
-            else:
-                raise OSError(f'Unexpected type: {info.name}')
+        with tarfile.open(fileobj=fh) as tf:
+            while True:
+                info = tf.next()
+                if info is None:
+                    break
+                # directory traversal shouldn't happen because we check the
+                # tarball hash, but check anyway
+                normalized = os.path.normpath(info.name)
+                if normalized.startswith(('/', '../')):
+                    raise OSError(f'Directory traversal: {info.name}')
+                if info.isfile() or info.isdir():
+                    tf.extract(info, path=basedir, set_attrs=False)
+                elif info.issym():
+                    (basedir / info.name).symlink_to(info.linkname)
+                else:
+                    raise OSError(f'Unexpected type: {info.name}')
     FROZEN.symlink_to(link_target)
 
 
@@ -1395,7 +1403,7 @@ def _rebuild(
 def coverage(outfile: str) -> None:
     """Unpack and run all tests and write coverage report to outfile."""
     if GCOV is None:
-        raise Exception('gcov was not found during setup')
+        raise DriverError('gcov was not found during setup')
     with _rebuild(['-D_gcov=true']) as basedir:
         # Run tests
         # Avoid races when writing coverage data
@@ -1451,7 +1459,7 @@ def sanitize(pattern: str = '*') -> None:
     clang sanitizers.  Ignore failures of test cases listed in the
     comma-separated OPENSLIDE_TEST_XFAIL environment variable."""
     if CLANG is None:
-        raise Exception('clang was not found during setup')
+        raise DriverError('clang was not found during setup')
     with _rebuild(['-D_sanitize=true'], env={'CC': CLANG.as_posix()}):
         xfail_env = os.environ.get('OPENSLIDE_TEST_XFAIL')
         xfail = xfail_env.split(',') if xfail_env else []
@@ -1587,12 +1595,11 @@ def clean(pattern: str = '*') -> None:
         path = WORKROOT / test.name
         if path.exists():
             rmtree(path)
-    if pattern == '*' or pattern == 'frozen':
-        if os.path.lexists(FROZEN):
-            basedir = FROZENBASE / os.readlink(FROZEN)
-            FROZEN.unlink()
-            if basedir.exists():
-                rmtree(basedir)
+    if (pattern == '*' or pattern == 'frozen') and os.path.lexists(FROZEN):
+        basedir = FROZENBASE / os.readlink(FROZEN)
+        FROZEN.unlink()
+        if basedir.exists():
+            rmtree(basedir)
 
 
 @_command
@@ -1632,7 +1639,7 @@ def _usage() -> None:
 
 def _main() -> None:
     if '@FEATURES@'.strip('@') == 'FEATURES':
-        raise Exception('This program must be built with Meson before use.')
+        raise DriverError('This program must be built with Meson before use.')
     try:
         cmd = sys.argv[1]
     except IndexError:
